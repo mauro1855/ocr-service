@@ -1,0 +1,51 @@
+Configutation:
+  status: warn
+
+  Appenders:
+    Console:
+      name: CONSOLE
+      target: SYSTEM_OUT
+      PatternLayout:
+        Pattern: "OCR %d{ISO8601} %-5p [%c{3}] [%t] %m%n"
+    RollingFile:
+      - name: FILE
+        fileName: logs/ocr-service.log
+        filePattern: "logs/$${date:yyyy-MM}/ocr-service-%d{yyyy-MM-dd}-%i.log.gz"
+        PatternLayout:
+          Pattern: "OCR %d{ISO8601} %-5p [%c{3}] [%t] %m%n"
+        policies:
+          TimeBasedTriggeringPolicy:
+            interval: 1
+            modulate: true
+
+  Loggers:
+      Root:
+        level: info
+        AppenderRef:
+          - ref: CONSOLE
+          - ref: FILE
+      Logger:
+        - name: com.github.mauro1855.ocrservice.controller.OCRController
+          additivity: false
+          level: info
+          AppenderRef:
+            - ref: CONSOLE
+            - ref: FILE
+        - name: com.github.mauro1855.ocrservice..service.OCRRequestService
+          additivity: false
+          level: info
+          AppenderRef:
+            - ref: CONSOLE
+            - ref: FILE
+        - name: com.github.mauro1855.ocrservice.worker.OCRRequestWorker
+          additivity: false
+          level: debug
+          AppenderRef:
+            - ref: CONSOLE
+            - ref: FILE
+        - name: com.github.mauro1855.ocrservice.service.OCRCallbackService
+          additivity: false
+          level: debug
+          AppenderRef:
+            - ref: CONSOLE
+            - ref: FILE
