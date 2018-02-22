@@ -48,8 +48,8 @@ communicated_date TIMESTAMP,
 OCR_start_date TIMESTAMP,
 OCR_end_date TIMESTAMP,
 request_stopped VARCHAR(1) DEFAULT 'N',
-file_to_ocr BLOB,
-ocred_file BLOB
+file_to_ocr LONGBLOB,
+ocred_file LONGBLOB
 );
 
 COMMIT;

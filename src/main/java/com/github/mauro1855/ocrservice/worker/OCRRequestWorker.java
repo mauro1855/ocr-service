@@ -6,8 +6,8 @@ import com.github.mauro1855.ocrservice.service.OCRCallbackService;
 import com.github.mauro1855.ocrservice.util.PriorityRunnable;
 import java.util.Date;
 
+import com.github.mauro1855.ocrservice.util.StreamConsumer;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,18 +17,17 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created by pereirat on 01/12/2016.
+ * Created by mauro1855 on 01/12/2016.
  */
 @Service
 public class OCRRequestWorker {
 
   private static Logger logger = LoggerFactory.getLogger(OCRRequestWorker.class);
 
-  private static final String TEMP_DIR = System.getProperty("java.io.tmpdir");
+  private static final String TEMP_DIR = getTempDir();
   private static final String VAR_DOCKER_SHARE_FOLDER = "!!folder!!";
 
   @Autowired
@@ -44,8 +43,23 @@ public class OCRRequestWorker {
   private String ocrCommand;
   @Value("${ocr.extra.commands}")
   private String ocrExtraCommands;
+  @Value("${ocr.output.required}")
+  private boolean ocrOutputRequired;
   @Value("${ocr.output.file.prefix.command}")
   private String ocrOutputFilePrefixCommand;
+
+  public static String getTempDir(){
+    String javaTemp = System.getProperty("java.io.tmpdir");
+    String lastCharacter = javaTemp.substring(javaTemp.length()-1);
+    if(lastCharacter.compareTo("/") == 0 || lastCharacter.compareTo("\\") == 0)
+      return javaTemp;
+    else if(javaTemp.contains("/"))
+      return javaTemp + "/";
+    else if(javaTemp.contains("\\"))
+      return javaTemp + "\\";
+
+    return javaTemp;
+  }
 
   /**
    * Creates a Runnable task that implements the multiple
@@ -69,6 +83,9 @@ public class OCRRequestWorker {
       @Override
       public void run() {
         logger.info("Started processing request {} with priority {}", request.getId(), request.getPriority());
+
+        // Gets the full request object (this way we get the file bytes again)
+        request.setFileToOCRByteArray(ocrRequestRepository.getRequest(request.getId()).getFileToOCRByteArray());
 
         // Marks the request as started in memory
         request.startOCR();
@@ -108,8 +125,8 @@ public class OCRRequestWorker {
   private void processOCRRequest(OCRRequest request){
 
     // creates temporary files
-    String sourceFileName = request.getId().toString()+"_source.pdf";
-    String targetFileName = sourceFileName.replace("_source", "_target");
+    String sourceFileName = request.getId().toString() + ".pdf";
+    String targetFileName = sourceFileName.replace(".pdf", "_ocr.pdf");
 
     File sourceFile = new File(TEMP_DIR + sourceFileName);
     File targetFile = new File(TEMP_DIR + targetFileName);
@@ -141,38 +158,72 @@ public class OCRRequestWorker {
     }
 
     String commandToExecute = processedCommand + " " + ocrExtraCommands + " " +
-        processedSourcePath + " " + ocrOutputFilePrefixCommand + " " + processedTargetPath;
+        processedSourcePath;
 
+    if(ocrOutputRequired)
+      commandToExecute += " " + ocrOutputFilePrefixCommand + " " + processedTargetPath;
+
+    Process process = null;
     try {
       // executes the command to call the external tool
       // waits for a maximum of 5 minutes for the OCR
       logger.debug("Calling external tool to OCR...");
       logger.trace("... on command {}", commandToExecute);
-      Process process;
-      process = runtime.exec(commandToExecute);
-      process.waitFor(5, TimeUnit.MINUTES);
 
-      if(process.exitValue() != 0){
+      process = runtime.exec(commandToExecute);
+
+      // Reads the streams from the process so it doesn't block the process
+      StreamConsumer processOutput = new StreamConsumer(process.getInputStream());
+      StreamConsumer processError = new StreamConsumer(process.getErrorStream());
+      processOutput.start();
+      processError.start();
+
+      if(!process.waitFor(10, TimeUnit.MINUTES) ){
+        // if process doesn't finish before the timeout
+        // request status to -1, sets a failure message and aborts process
+        logger.warn("Request {} is taking too much time - aborting", request.getId());
+        request.setStatusCode(-1);
+        request.setStatusMessage("Request " + request.getId() + " exceeded the 10 minute time-out.");
+      }else if(process.exitValue() != 0){
         // if process did not exited with success code then set
         // request status to -1, sets a failure message and returns
-        InputStream error = process.getErrorStream();
-        String errorString =  IOUtils.toString(error);
-        logger.error("An error occurred running the tool for request {}: {}", request.getId(), errorString);
+        logger.error("An error occurred running the tool for request {}", request.getId());
         request.setStatusCode(-1);
-        request.setStatusMessage("An internal error occured while processing the request" + request.getId());
-        return;
+        request.setStatusMessage("An internal error occured while processing the request " + request.getId());
+      }else {
+        // otherwise it sets the request as successful and the OCRed content in the request
+        request.setOcredFileByteArray(FileUtils.readFileToByteArray(targetFile));
+        request.setStatusCode(1);
+        request.setStatusMessage("Successfully OCRed");
       }
-      // otherwise it sets the request as successful and the OCRed content in the request
-      request.setOcredFileByteArray(FileUtils.readFileToByteArray(targetFile));
-      request.setStatusCode(1);
-      request.setStatusMessage("Successfully OCRed");
 
-    } catch (Exception ex){
+    }catch(Exception ex){
       // if an exception occurred, then marks the request status code as -1
       // and a failure message
-      logger.error("An error occurred running the tool for request {}", request.getId());
+      logger.error("An error occurred running the tool for request {}:{}", request.getId(), ex.getMessage());
       request.setStatusCode(-1);
       request.setStatusMessage("An internal error occured while processing the request " + request.getId());
+
+    }finally{
+
+      if(process != null && process.isAlive()){
+        logger.debug("Process is still alive. Killing...");
+        process.destroy();
+        try {
+          process.waitFor();
+        } catch (InterruptedException e) {
+          logger.warn("Impossible to kill process.");
+        }
+      }
+      // delete temp files
+      if(sourceFile.exists()){
+        sourceFile.delete();
+      }
+
+      if(targetFile.exists()){
+        targetFile.delete();
+      }
+
     }
   }
 
@@ -190,6 +241,14 @@ public class OCRRequestWorker {
 
   public void setOcrExtraCommands(String ocrExtraCommands) {
     this.ocrExtraCommands = ocrExtraCommands;
+  }
+
+  public boolean isOcrOutputRequired() {
+    return ocrOutputRequired;
+  }
+
+  public void setOcrOutputRequired(boolean ocrOutputRequired) {
+    this.ocrOutputRequired = ocrOutputRequired;
   }
 
   public String getOcrOutputFilePrefixCommand() {

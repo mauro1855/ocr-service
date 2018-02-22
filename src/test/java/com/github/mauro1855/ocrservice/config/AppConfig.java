@@ -1,17 +1,19 @@
 package com.github.mauro1855.ocrservice.config;
 
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
 import com.github.mauro1855.ocrservice.util.OCRThreadPoolExecutor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 /**
  * Created by mauro1855 on 19/12/2016.
  */
+
+// App config for tests
 @Configuration
 public class AppConfig {
 
@@ -33,6 +35,6 @@ public class AppConfig {
 
     @Bean
     public boolean isRunningTests() {
-        return false;
+        return true;
     }
 }

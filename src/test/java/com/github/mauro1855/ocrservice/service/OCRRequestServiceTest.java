@@ -1,11 +1,13 @@
 package com.github.mauro1855.ocrservice.service;
 
-import com.github.mauro1855.ocrservice.domain.OCRRequest;
-import com.github.mauro1855.ocrservice.repository.OCRRequestRepository;
-import com.github.mauro1855.ocrservice.util.PriorityRunnable;
-import com.github.mauro1855.ocrservice.worker.OCRRequestWorker;
 import java.util.ArrayList;
 import java.util.Date;
+
+import com.github.mauro1855.ocrservice.domain.OCRRequest;
+import com.github.mauro1855.ocrservice.repository.OCRRequestRepository;
+import com.github.mauro1855.ocrservice.util.OCRThreadPoolExecutor;
+import com.github.mauro1855.ocrservice.util.PriorityRunnable;
+import com.github.mauro1855.ocrservice.worker.OCRRequestWorker;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.InjectMocks;
@@ -15,12 +17,13 @@ import org.mockito.Spy;
 import org.springframework.http.HttpMethod;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Created by pereirat on 19/12/2016.
+ * Created by mauro1855 on 19/12/2016.
  */
 public class OCRRequestServiceTest {
 
@@ -29,6 +32,9 @@ public class OCRRequestServiceTest {
 
     @Mock
     private OCRRequestRepository ocrRequestRepository;
+
+    @Mock
+    private OCRThreadPoolExecutor priorityExecutor;
 
 
     @Spy
@@ -59,6 +65,7 @@ public class OCRRequestServiceTest {
     public void test_registerNewOCRRequest() throws Exception {
 
         mockRequest.setId(2L);
+        mockRequest.setFileToOCRByteArray(new byte[] {});
 
         when(ocrRequestWorker.getRunnable(mockRequest)).thenReturn(new PriorityRunnable() {
             @Override
@@ -81,6 +88,7 @@ public class OCRRequestServiceTest {
 
         verify(ocrRequestRepository).createNewRequest(any(OCRRequest.class));
         assertEquals(2L, result);
+        assertNull(mockRequest.getFileToOCRByteArray());
 
     }
 

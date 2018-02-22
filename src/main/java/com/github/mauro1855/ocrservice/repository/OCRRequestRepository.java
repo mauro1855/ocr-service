@@ -13,7 +13,7 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 /**
- * Created by pereirat on 07/12/2016.
+ * Created by mauro1855 on 07/12/2016.
  */
 @Repository
 public class OCRRequestRepository {
@@ -22,6 +22,8 @@ public class OCRRequestRepository {
     private NamedParameterJdbcTemplate ocrServiceJdbcTemplate;
 
     private static final String GET_UNPROCESSED_REQUESTS = "SELECT * FROM ocr_requests WHERE status_code = 0 AND request_stopped = 'N' ORDER BY priority DESC, creation_date ASC";
+
+    private static final String GET_SINGLE_REQUEST = "SELECT * FROM ocr_requests WHERE id = :requestId";
 
     private static final String GET_FAILED_COMMUNICATION_REQUESTS = "SELECT * FROM ocr_requests WHERE communicated = 'N' AND communication_attempted = 'Y' AND request_stopped = 'N' ORDER BY priority DESC, creation_date ASC";
 
@@ -59,6 +61,16 @@ public class OCRRequestRepository {
             "ocred_file = :ocredFile \n" +
             "WHERE id = :id";
 
+
+    /**
+     * Gets an OCRRequest by it's ID
+     * @param requestId of the request
+     * @return {OCRRequest}
+     */
+    public OCRRequest getRequest(Long requestId){
+        MapSqlParameterSource parameters = new MapSqlParameterSource().addValue( "requestId", requestId);
+        return ocrServiceJdbcTemplate.queryForObject(GET_SINGLE_REQUEST, parameters, ocrRequestTypeMapping());
+    }
 
     /**
      * Inserts a new request in the database
@@ -110,11 +122,7 @@ public class OCRRequestRepository {
         else
             parameters.addValue("fileToOCR", request.getFileToOCRByteArray()).addValue( "ocredFile",  request.getOcredFileByteArray());
 
-        try {
-            ocrServiceJdbcTemplate.update(UPDATE_REQUEST, parameters);
-        }catch (Exception ex){
-            ex.printStackTrace();
-        }
+        ocrServiceJdbcTemplate.update(UPDATE_REQUEST, parameters);
     }
 
     /**

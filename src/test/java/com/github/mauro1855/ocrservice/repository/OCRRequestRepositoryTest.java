@@ -1,8 +1,8 @@
 package com.github.mauro1855.ocrservice.repository;
 
-import com.github.mauro1855.ocrservice.domain.OCRRequest;
 import java.util.Map;
 
+import com.github.mauro1855.ocrservice.domain.OCRRequest;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,7 +21,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.verify;
 
 /**
- * Created by pereirat on 19/12/2016.
+ * Created by mauro1855 on 19/12/2016.
  */
 public class OCRRequestRepositoryTest {
 
@@ -41,7 +41,27 @@ public class OCRRequestRepositoryTest {
     }
 
     @Test
-    public void createNewRequest() throws Exception {
+    public void test_getRequest() throws Exception {
+        ArgumentCaptor<MapSqlParameterSource> sqlParametersCaptor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
+        ArgumentCaptor<String> sqlQueryCaptor = ArgumentCaptor.forClass(String.class);
+
+        ocrRequestRepository.getRequest(mockRequest.getId());
+
+        verify(foundJdbcTemplate).queryForObject(sqlQueryCaptor.capture(), sqlParametersCaptor.capture(), any(RowMapper.class));
+
+        Map<String, Object> sqlParametersMap = sqlParametersCaptor.getValue().getValues();
+        String originalQuery = sqlQueryCaptor.getValue();
+        String processedQuery = originalQuery;
+
+        for(String key : sqlParametersMap.keySet()){
+            processedQuery = processedQuery.replace(":" + key, "something not Relevant");
+        }
+        // To confirm all parameters were replaced
+        assertFalse(processedQuery.contains(":"));
+    }
+
+    @Test
+    public void test_createNewRequest() throws Exception {
         ArgumentCaptor<MapSqlParameterSource> sqlParametersCaptor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
         ArgumentCaptor<String> sqlQueryCaptor = ArgumentCaptor.forClass(String.class);
 
@@ -65,7 +85,7 @@ public class OCRRequestRepositoryTest {
     }
 
     @Test
-    public void updateRequest() throws Exception {
+    public void test_updateRequest() throws Exception {
         ArgumentCaptor<MapSqlParameterSource> sqlParametersCaptor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
         ArgumentCaptor<String> sqlQueryCaptor = ArgumentCaptor.forClass(String.class);
 
@@ -86,14 +106,14 @@ public class OCRRequestRepositoryTest {
     }
 
     @Test
-    public void getAllUnprocessedRequests() throws Exception {
+    public void test_getAllUnprocessedRequests() throws Exception {
         ocrRequestRepository.getAllUnprocessedRequests();
 
         verify(foundJdbcTemplate).query(any(String.class), any(RowMapper.class));
     }
 
     @Test
-    public void getAllFailedCommunicationRequests() throws Exception {
+    public void test_getAllFailedCommunicationRequests() throws Exception {
         ocrRequestRepository.getAllFailedCommunicationRequests();
 
         verify(foundJdbcTemplate).query(any(String.class), any(RowMapper.class));

@@ -8,7 +8,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import javax.sql.DataSource;
 
 /**
- * Created by pereirat on 07/12/2016.
+ * Created by mauro1855 on 07/12/2016.
  */
 @Configuration
 public class DBConfig {

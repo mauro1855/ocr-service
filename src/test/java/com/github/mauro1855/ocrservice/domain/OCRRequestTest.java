@@ -8,7 +8,7 @@ import org.springframework.http.HttpMethod;
 import static org.junit.Assert.*;
 
 /**
- * Created by pereirat on 19/12/2016.
+ * Created by mauro1855 on 19/12/2016.
  */
 public class OCRRequestTest {
 

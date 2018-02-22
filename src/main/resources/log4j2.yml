@@ -45,7 +45,7 @@ Configutation:
             - ref: FILE
         - name: com.github.mauro1855.ocrservice.service.OCRCallbackService
           additivity: false
-          level: debug
+          level: info
           AppenderRef:
             - ref: CONSOLE
             - ref: FILE

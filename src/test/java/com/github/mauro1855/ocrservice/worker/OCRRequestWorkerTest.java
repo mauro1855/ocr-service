@@ -1,13 +1,17 @@
 package com.github.mauro1855.ocrservice.worker;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.concurrent.TimeUnit;
+
 import com.github.mauro1855.ocrservice.domain.OCRRequest;
 import com.github.mauro1855.ocrservice.repository.OCRRequestRepository;
 import com.github.mauro1855.ocrservice.service.OCRCallbackService;
 import com.github.mauro1855.ocrservice.util.PriorityRunnable;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import org.apache.commons.io.FileUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.InjectMocks;
@@ -21,7 +25,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Created by pereirat on 19/12/2016.
+ * Created by mauro1855 on 19/12/2016.
  */
 public class OCRRequestWorkerTest {
 
@@ -33,6 +37,9 @@ public class OCRRequestWorkerTest {
 
     @Mock
     private Runtime runtime;
+
+    @Mock
+    private Process mockedProcess;
 
     @Spy
     @InjectMocks
@@ -50,7 +57,7 @@ public class OCRRequestWorkerTest {
         mockRequest.setId(250L);
         mockRequest.startOCR();
         mockRequest.setFileToOCRByteArray("Test".getBytes());
-
+        when(ocrRequestRepository.getRequest(mockRequest.getId())).thenReturn(mockRequest);
     }
 
     @Test
@@ -60,7 +67,7 @@ public class OCRRequestWorkerTest {
         assertTrue(runnable instanceof PriorityRunnable);
         PriorityRunnable priorityRunnable = (PriorityRunnable) runnable;
         assertEquals((int) mockRequest.getPriority(), priorityRunnable.getPriority());
-        assertEquals(mockRequest.getRequestOCRStartDate(), priorityRunnable.getDate());
+        assertEquals(mockRequest.getRequestCreationDate(), priorityRunnable.getDate());
     }
 
     @Test
@@ -79,7 +86,43 @@ public class OCRRequestWorkerTest {
     }
 
     @Test
+    public void test_externalToolTookTooMuchTime() throws IOException {
+        Process mockProcess = newTimeOutProcess();
+
+        mockRequest.setRequestOCREndDate(null);
+        when(runtime.exec(any(String.class))).thenReturn(mockProcess);
+
+        ocrRequestWorker.getRunnable(mockRequest).run();
+
+        assertNotNull(mockRequest.getRequestOCREndDate());
+        assertEquals(-1, (int) mockRequest.getStatusCode());
+        verify(runtime, times(3)).exec(any(String.class));
+        verify(ocrRequestRepository).updateRequest(mockRequest);
+        verify(ocrCallbackService).replyToRequest(mockRequest);
+    }
+
+    @Test
+    public void test_aliveProcessIsDestroyed() throws Exception {
+        mockRequest.setRequestOCREndDate(null);
+        when(runtime.exec(any(String.class))).thenReturn(mockedProcess);
+        when(mockedProcess.getErrorStream()).thenReturn(new ByteArrayInputStream("Test".getBytes()));
+        when(mockedProcess.getInputStream()).thenReturn(new ByteArrayInputStream("Test".getBytes()));
+        when(mockedProcess.waitFor(any(Long.class), any(TimeUnit.class))).thenReturn(false);
+        when(mockedProcess.isAlive()).thenReturn(true);
+
+        ocrRequestWorker.getRunnable(mockRequest).run();
+
+        verify(mockedProcess, atLeast(1)).destroy();
+    }
+
+    @Test
     public void test_OCRSuccessful() throws IOException {
+
+        String targetFileName = ocrRequestWorker.getTempDir() + mockRequest.getId() + "_ocr.pdf";
+        File mockFile = new File(targetFileName);
+        byte[] emptyByteArray = "1".getBytes();
+        FileUtils.writeByteArrayToFile(mockFile, emptyByteArray);
+
         Process mockProcess = newSuccessProcess();
         mockRequest.setRequestOCREndDate(null);
         when(runtime.exec(any(String.class))).thenReturn(mockProcess);
@@ -102,7 +145,7 @@ public class OCRRequestWorkerTest {
 
             @Override
             public InputStream getInputStream() {
-                return null;
+                return new ByteArrayInputStream("Test".getBytes());
             }
 
             @Override
@@ -137,7 +180,7 @@ public class OCRRequestWorkerTest {
 
             @Override
             public InputStream getInputStream() {
-                return null;
+                return new ByteArrayInputStream("Test".getBytes());
             }
 
             @Override
@@ -148,6 +191,45 @@ public class OCRRequestWorkerTest {
             @Override
             public int waitFor() throws InterruptedException {
                 return 0;
+            }
+
+            @Override
+            public int exitValue() {
+                return 0;
+            }
+
+            @Override
+            public void destroy() {
+                return;
+            }
+        };
+    }
+
+    private Process newTimeOutProcess(){
+        return new Process() {
+            @Override
+            public OutputStream getOutputStream() {
+                return null;
+            }
+
+            @Override
+            public InputStream getInputStream() {
+                return new ByteArrayInputStream("Test".getBytes());
+            }
+
+            @Override
+            public InputStream getErrorStream() {
+                return new ByteArrayInputStream("Test".getBytes());
+            }
+
+            @Override
+            public int waitFor() throws InterruptedException {
+                return 0;
+            }
+
+            @Override
+            public boolean waitFor(long timeout, TimeUnit unit){
+                return false;
             }
 
             @Override

@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Created by pereirat on 01/12/2016.
+ * Created by mauro1855 on 01/12/2016.
  */
 @RestController
 @RequestMapping("/ocr")

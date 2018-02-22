@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * Created by pereirat on 01/12/2016.
+ * Created by mauro1855 on 01/12/2016.
  */
 public class PriorityFuture<T> implements RunnableFuture<T> {
 
